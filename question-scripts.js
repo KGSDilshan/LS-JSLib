@@ -1,4 +1,8 @@
 /* Question level Globals */
+/*
+    id: html id
+    order: [arrayOfIndexes]
+*/
 var CURRENT_ROTATIONS = [];
 
 /* Utility Functions */
@@ -18,7 +22,13 @@ function GetRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
 }
 
-
+/*
+ * Remove spaces and blanks from an array by creating a new array with those indicies removed
+ *
+ * @param {array} arr
+ *
+ * @return {arr} tempArr
+ */
 function RemoveBlankSpace(arr) {
     tempArr = [];
     for (let i = 0; i < arr.length; i++) {
@@ -114,6 +124,34 @@ function RemoveBlankSpace(arr) {
 
 
 /*
+ * Stores answer options to avoid hitting on DD for given questions
+ *
+ * @param {HTML} <excludeDD>
+ *
+ */
+function SetDDExclusions() {
+    // store exclusions given in a cookie
+    const exclusionObj = document.getElementsByTagName("excludeDD");
+    if (exclusionObj.length < 1) {
+        return
+    }
+    let exclusions = exclusionObj[0].innerHTML.split(" ").join("").split("|");
+    // each exclusions is formatted QuestionName,opt1,opt2,opt3,...
+    for (let i = 0; i < exclusions.length; i++) {
+        let exclusion = exclusions[i].trim().split(",");
+        let qName = exclusion.splice(0, 1)[0];
+        // store everything in a cookie
+        let cookieVal = "";
+        for (let j = 0; j < exclusion.length; j++) {
+            cookieVal += exclusion[j].toString() + ",";
+        }
+        Cookies.set(qName, cookieVal);
+    }
+    $(exclusionObj).replaceWith("");
+}
+
+
+/*
  * Run DD for a radio question. Selects a random answer from a radio question, and emulates the
  * submit button being pressed.
  *
@@ -121,7 +159,28 @@ function RemoveBlankSpace(arr) {
 function PickRandomRadioAnswer() {
     // pick a random radio answer
     const answers = document.getElementsByClassName("answer-item");
-    let checkedIndex = GetRandomInt(0, answers.length);
+
+    // get Question ID of the current question
+    const currentQname = document.getElementById("QNameNumData").dataset.code;
+    let exclusiveOpts = Cookies.get(currentQname);
+    let checkedIndex;
+    if (exclusiveOpts === undefined) {
+        checkedIndex = GetRandomInt(0, answers.length);
+    } else {
+        let foundOpt = true;
+        exclusiveOpts = exclusiveOpts.trim().split(",");
+        while (foundOpt == true) {
+            checkedIndex = GetRandomInt(0, answers.length).toString();
+            // see if the checked index is in the list
+            foundOpt = false;
+            for (let i = 0; i < exclusiveOpts.length; i++) {
+                if (checkedIndex === exclusiveOpts[i]) {
+                    foundOpt = true;
+                    break;
+                }
+            }
+        }
+    }
     let radioId = answers[checkedIndex].id.replace("javatbd", "answer");
     let isOther = false;
     let button;
@@ -211,7 +270,6 @@ function RunDD() {
     } else if (stop > 0) {
         Cookies.set("runDD", 0);
     } else if (run > 0) {
-        Cookies.remove('rotationTracker');
         Cookies.set('runDD', '1');
         RunDD();
     }
@@ -225,27 +283,36 @@ function RunDD() {
  */
 function RotationTracker() {
     let rotTracker = Cookies.get('rotationTracker');
-    const currentQid = document.getElementById("fieldnames").value.split("X")[2];
-    if (rotTracker == undefined){
+    const currentQname = document.getElementById("QNameNumData").dataset.code;
+    if (rotTracker === undefined) {
         // initialize rotation tracker and add the current question to it
-        Cookies.set('rotationTracker', currentQid)
+        Cookies.set('rotationTracker', currentQname)
     } else {
-        if (rotTracker.indexOf(currentQid) !== -1) {
+        // previous button can re-add the question, if the question is in, don't add it twice
+        if (rotTracker.indexOf(currentQname) !== -1) {
             return;
         }
-        rotTracker += "," + currentQid;
+        rotTracker += "," + currentQname;
         Cookies.set('rotationTracker', rotTracker);
     }
 }
 
 
-/* HTML -> JS rotation scripts */
+/*
+ * Clears the rotationTracker cookie. Abstract JS Cookie in the front end.
+ *
+ */
+function StartRotationTracker() {
+    Cookies.remove('rotationTracker');
+}
 
+
+/* HTML -> JS rotation scripts */
 /*
  * Get the index of an ID rotation from the CURRENT_ROTATIONS array (which is storing item rotation order)
  *
  * @param {number} id
- * @return {number} index
+ * @return {number} index - if not found -1
  */
 function GetRotationIndexById(id) {
     for (let index = 0; index < CURRENT_ROTATIONS.length; index++) {
@@ -253,254 +320,148 @@ function GetRotationIndexById(id) {
             return index;
         }
     }
+
+    return -1;
 }
 
 
 /*
- * Check if a rotation is inline or a ul-list rotation
+ * Execute <rot> or <rotul> tagged rotation. Creates an order, and rotates items in that order.
+ * If useUl is true, use a list, else use inline rotation
  *
- * @return {(bool|{rotations: htmlObj, useUl: Boolean})}
- */
-function GetRotationType() {
-    let rotations = document.getElementsByTagName("rot");
-    let useUl = false;
-    if (rotations.length == 0) {
-        // if there doesn't exist a normal "rot" search for "rotul" instead
-        rotations = document.getElementsByTagName("rotul");
-        if (rotations.length > 0) {
-            useUl = true;
-        } else {
-            return false;
-        }
-    }
-
-    return {
-        rotations: rotations[0],
-        useUl: useUl
-    };
-}
-
-
-/*
- * Get the text and answer options that are rotating for a given HTML rotation Object
- *
- * @param {HtmlObj} rotations
- * @return {object} {anchored : {item : string, index: number, ansOpts : [number array]}, options: [number array]}
- */
-function GetRotatedItems(rotations) {
-    // get filtered list items
-    let options = rotations.innerHTML.split("\n").join("").split("|");
-    options = options.filter(function(el) {
-        return el && (el.trim() != '');
-    });
-    let anchored = [];
-    for (let i = 0; i < options.length; i++) {
-        let content = options[i].match(/\[(.*?)\]/);
-        // store the rotation items, answers bound to them and index of item
-        if (content != "" && content != null) {
-            content = content[1];
-            options[i] = options[i].replace("[" + content + "]", "");
-            options[i] = [options[i], content, i];
-        } else {
-            content = [];
-            options[i] = [options[i], content, i];
-        }
-        // get anchored items and their indexes
-        if (options[i][0].startsWith("$$")) {
-            options[i][0] = options[i][0].slice(2, options[i][0].length);
-            anchored.push({item: options[i][0], index : i, ansOpts : options[i][1]});
-            options[i] = undefined;
-        }
-    }
-    options = options.filter(function(el) {
-        return el && (el.toString().trim() != '');
-    });
-
-    return {
-        anchored : anchored,
-        options : options
-    };
-}
-
-
-/*
- * Given an order, rotate the contents of a rotation list in that order.
- *
- * @param {number array} order
- */
-function RotateItemsOrder(order) {
-    // get rotation type, list or inline
-    const rotType = GetRotationType();
-    if (!rotType) {
-        return;
-    }
-    let rotations = rotType.rotations;
-    const useUl = rotType.useUl;
-    const rotOpts = GetRotatedItems(rotations);
-    let anchored = rotOpts.anchored;
-    let options = rotOpts.options;
-
-    let result = useUl ? "<ul>" : "";
-    const prefix = useUl ? "<li>" : "";
-    const suffix = useUl ? "</li>" : "";
-
-    // clear existing answer HTML objects and store them
-    let ansList = document.getElementsByClassName("answers-list").item(0);
-    let ans = document.getElementsByClassName("answer-item");
-    let answerOptions = [];
-    for (let i = ans.length - 1; i >= 0; i--) {
-        answerOptions.push(ans.item(0));
-        ansList.removeChild(ans.item(0));
-    }
-
-    // rearrange stored HTML objects according to order given
-    for (let i = 0; i < order.length; i++) {
-        if (order[i] == anchored[0].index) {
-            // there exists an anchored option at this question index
-            result += prefix + anchored[0].item + suffix;
-            let opts = anchored[0].ansOpts;
-            if (opts.length > 0) {
-                opts = opts.split(",");
-                for (let k = 0; k < opts.length; k++) {
-                    ansList.append(answerOptions[opts[parseInt(k)]]);
-                    answerOptions[opts[parseInt(k)]] = undefined;
-                }
-            }
-            anchored.splice(0, 1);
-        } else {
-            // get the correct answer option from the options list for this index
-            let index;
-            for (let j = 0; j < options.length; j++) {
-                if (options[j][2] == order[i]) {
-                    index = j;
-                    break;
-                }
-            }
-            let opts = options[index][1];
-            if (opts.length > 0) {
-                opts = opts.split(",");
-                for (let j = 0; j < opts.length; j++) {
-                    ansList.append(answerOptions[parseInt(opts[j])]);
-                    answerOptions[parseInt(opts[j])] = undefined;
-                }
-            }
-            result += prefix + options[index][0] + suffix;
-        }
-    }
-    // push remaining answer options that aren't rotating into the answer list
-    for (let i = 0; i < answerOptions.length; i++) {
-        if (answerOptions[i] !== undefined) {
-            ansList.append(answerOptions[i]);
-        }
-    }
-
-    result += useUl ? "</ul>" : "";
-    $(rotations).replaceWith(result);
-}
-
-
-/*
- * Randomize the order of items in rotation tags.
+ * @param {Boolean} useUl
  *
  */
-function RotateItems() {
-    // get rotation type, list or inline
-    const rotType = GetRotationType();
-    if (!rotType) {
-        return;
-    }
-    let rotations = rotType.rotations;
-    const useUl = rotType.useUl;
-
-    // get rotation object, or create one if one doesn't exist
-    if (rotations.id != "") {
-        // rotation has an ID, generate an object for it if one doesn't exist
-        if (CURRENT_ROTATIONS.length == 0) {
-            CURRENT_ROTATIONS.push({id: rotations.id, rotated: false});
-        } else {
-            for (let i = 0; i < CURRENT_ROTATIONS.length; i++) {
-                if (CURRENT_ROTATIONS[i].id == rotations.id && CURRENT_ROTATIONS[i].order) {
-                    // if a rotation with the ID exists, we should match that rotation's order
-                    RotateItemsOrder(CURRENT_ROTATIONS[i].order);
-                    RotateItems();
-                    return;
-                } else if (i == CURRENT_ROTATIONS.length - 1) {
-                    CURRENT_ROTATIONS.push({id: rotations.id, rotated: false});
-                    break;
-                }
-            }
-        }
-    }
-    const rotOpts = GetRotatedItems(rotations);
-    let anchored = rotOpts.anchored;
-    let options = rotOpts.options;
-
-    let result = useUl ? "<ul>" : "";
-    const prefix = useUl ? "<li>" : "";
-    const suffix = useUl ? "</li>" : "";
-    let ansList = document.getElementsByClassName("answers-list").item(0);
-    let ans = document.getElementsByClassName("answer-item");
-    let answerOptions = [];
-    let order = [];
-    for (let i = ans.length - 1; i >= 0; i--) {
-        answerOptions.push(ans.item(0));
-        ansList.removeChild(ans.item(0));
-    }
-    let counter = 0;
-    while ((options.length + anchored.length) != 0) {
-        // if there exist an anchored item at this question index
-        if (anchored.length > 0) {
-            if (anchored[0].index == counter) {
-                result += prefix + anchored[0].item + suffix;
-                let opts = anchored[0].ansOpts;
-                if (opts.length > 0) {
-                    opts = opts.split(",");
-                    for (let i = 0; i < opts.length; i++) {
-                        ansList.append(answerOptions[opts[parseInt(i)]]);
-                        answerOptions[opts[parseInt(i)]] = undefined;
-                    }
-                }
-                order.push(anchored[0].index);
-                anchored.splice(0, 1);
-                counter++;
+function ProcessRotation(useUl=false) {
+    // randomize inline rotation
+    const rotTags = useUl ? document.getElementsByTagName("ROTUL") : document.getElementsByTagName("ROT");
+    while (rotTags.length > 0) {
+        const htmlObj = rotTags[0];
+        const htmlId = htmlObj.id;
+        let storeRotation = false;
+        // check if there exists an ID on this rotation
+        if (htmlId !== "") {
+            // item has an ID, see if a rotation order was stored for this item
+            const index = GetRotationIndexById(htmlId);
+            if (index == -1) {
+                // if the item has no stored rotation item, mark it to store a rotation
+                storeRotation = true;
+            } else {
+                RotateText(htmlObj, CURRENT_ROTATIONS[index].order, useUl);
                 continue;
             }
         }
-        // pick a random answer option and insert it into this index
-        let index = Math.floor(Math.random() * options.length);
-        order.push(options[index][2]);
-        let opts = options[index][1];
-        if (opts.length > 0) {
-            opts = opts.split(",");
-            for (let i = 0; i < opts.length; i++) {
-                ansList.append(answerOptions[parseInt(opts[i])]);
-                answerOptions[parseInt(opts[i])] = undefined;
+        // generate a random order, respecting anchors
+        let options = htmlObj.innerHTML.split("\n").join("").split("|");
+        options = options.filter(function(el) {
+            return el && (el.trim() != '');
+        });
+        let rotatingIndicies = [];
+        let anchoredIndicies = [];
+        for (let i = 0; i < options.length; i++) {
+            if (!options[i].startsWith("$$")) {
+                rotatingIndicies.push(i);
             }
         }
-        result += prefix + options[index][0] + suffix;
-        options.splice(index, 1);
-        counter++;
-	}
+        rotatingIndicies.sort(() => Math.random() - 0.5);
+        // loop through options array
+        for (let i = 0; i < options.length; i++) {
+            // insert into rotatingIndicies, anchored options
+            if (options[i].startsWith("$$")) {
+                rotatingIndicies.splice(i, 0, i);
+            }
+        }
+        if (storeRotation) {
+            CURRENT_ROTATIONS.push({
+                    id: htmlId,
+                    order: rotatingIndicies
+                });
+        }
+        RotateText(htmlObj, rotatingIndicies, useUl);
+    }
+}
 
-    // populate the answer options that aren't rotating
-    for (let i = 0; i < answerOptions.length; i++) {
-        if (answerOptions[i] != undefined) {
-            ansList.append(answerOptions[i]);
-        }
+
+/*
+ * Rotates items in text and answer options given a rotation order of the items
+ *
+ * @param {HTMLObj} htmlObj - rot tag object
+ * @param {Array} order - array of indicies dictating an order to rotate things in
+ * @param {Boolean} useUl - use list html or inline
+ */
+function RotateText(htmlObj, order, useUl) {
+    let options = htmlObj.innerHTML.split("\n").join("").split("$$").join("").split("|");
+    options = options.filter(function(el) {
+        return el && (el.trim() != '');
+    });
+
+    // arrange the options in the given order
+    let temp = [];
+    for (let i = 0; i < order.length; i++) {
+        temp.push(options[order[i]]);
     }
-    // log rotation order of this question if an ID exists for it
-    if (rotations.id != "") {
-        for (let i = 0; i < order.length; i++) {
-            if (order[i] != i) {
-                CURRENT_ROTATIONS[GetRotationIndexById(rotations.id)].rotated = true;
-                CURRENT_ROTATIONS[GetRotationIndexById(rotations.id)].order = order;
-                break;
+    options = temp;
+
+    let ansRotation = [];
+    for (let i = 0; i < options.length; i++) {
+        let content = options[i].match(/\[(.*?)\]/);
+        if (content !== null) {
+            content = content[1];
+            options[i] = options[i].replace("[" + content + "]", "");
+            content = content.split(" ").join("").split("\t").join("").split(",");
+            for (let j = 0; j < content.length; j++) {
+                ansRotation.push(content[j]);
             }
         }
     }
-    result += useUl ? "</ul>" : "";
-    $(rotations).replaceWith(result);
-    RotateItems();
+
+
+    // clear existing answer HTML objects and store them
+    let ansList, ans, answerOptions;
+    if (ansRotation.length > 0) {
+        ansList = document.getElementsByClassName("answers-list").item(0);
+        ans = document.getElementsByClassName("answer-item");
+        answerOptions = [];
+        for (let i = ans.length - 1; i >= 0; i--) {
+            answerOptions.push(ans.item(0));
+            ansList.removeChild(ans.item(0));
+        }
+        temp = [];
+        for (let i = 0; i < ansRotation.length; i++) {
+            temp.push(answerOptions[ansRotation[i]]);
+            answerOptions[ansRotation[i]] = undefined;
+        }
+        for (let i = 0; i < answerOptions.length; i++) {
+            if (answerOptions[i] !== undefined) {
+                temp.push(answerOptions[i]);
+            }
+        }
+        for (let i = 0; i < temp.length; i++) {
+            ansList.append(temp[i]);
+        }
+    }
+
+    // generate a results string for Question Text
+    let result = useUl ? "<ul>" : "";
+    const prefix = useUl ? "<li>" : "";
+    const suffix = useUl ? "</li>" : "";
+    for (let i = 0; i < options.length; i++) {
+        result += prefix + options[i] + suffix;
+    }
+    $(htmlObj).replaceWith(result);
+    //console.log({a: options, b : ansRotation});
+}
+
+
+/*
+ * Run rotation on <rot> and <rotul> tags
+ *
+ */
+function ProcessAllRotations() {
+    // inline rotation
+    ProcessRotation();
+    // list rotation
+    ProcessRotation(true);
 }
 
 
@@ -550,7 +511,7 @@ function AnswersFlip() {
     }
     // get a sub array of values between start and end
     let arrFlipped = answerOptions.slice(start, end + 1);
-    if (ansFlip[0].id != "" && CURRENT_ROTATIONS[GetRotationIndexById(ansFlip[0].id)].rotated) {
+    if (CURRENT_ROTATIONS[ansFlip[0].id] != -1) {
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
     } else if (GetRandomInt(0, 100) >= 50) {
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
@@ -588,6 +549,18 @@ function SetpMode(value) {
 
 
 /*
+ * Hide all data between given HTML tags
+ *
+ * @param {string} tagName
+ */
+function RemoveTagText(tagName) {
+    let docTags = document.getElementsByTagName(tagName);
+    while (docTags.length > 0) {
+        docTags[0].parentNode.removeChild(docTags[0]);
+    }
+}
+
+/*
  * Replace text based on mode.
  *
  * @param {HTML} <p-o>Phone only text</p-o>
@@ -609,18 +582,19 @@ function ParseModeText() {
     switch (mode) {
         case 1:
             // phone mode, hide all email and text tags
-            let ettags = document.getElementsByTagName("E-T");
-            for (let i = 0; i < ettags.length; i++) {
-                ettags[i].parentNode.removeChild(ettags[i]);
-            }
+            RemoveTagText("E-T");
+            RemoveTagText("E-O");
+            RemoveTagText("T-O");
             break;
         case 2:
+            // email, hide all text and phone only tags
+            RemoveTagText("P-O");
+            RemoveTagText("T-O");
+            break;
         case 3:
-            // email/text mode, hide all phone tags
-            let ptags = document.getElementsByTagName("P-O");
-            for (let i = 0; i < ptags.length; i++) {
-                ptags[i].parentNode.removeChild(ptags[i]);
-            }
+            // text, hide all email and phone only tags
+            RemoveTagText("P-O");
+            RemoveTagText("T-O");
             break;
     };
 }
@@ -630,14 +604,15 @@ function ParseModeText() {
  * Functions to execute per question. Functions appear in order of execution.
  */
 $(document).ready(function()  {
+    SetDDExclusions();
     // Dummy Data
     RunDD();
     // Rotation tracker
     RotationTracker();
-    // PMode substitutions
+    // PMode substitutions, before doing any item rotation
     ParseModeText();
     // Question and Answer level rotation of text and options
-    RotateItems();
+    ProcessAllRotations();
     // Flip answer options
     AnswersFlip();
     // Insert text between options
