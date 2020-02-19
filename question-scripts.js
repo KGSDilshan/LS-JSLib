@@ -23,6 +23,22 @@ function GetRandomInt(min, max) {
 }
 
 /*
+ * Repeat a string X times. Replacement for ES6's str.repeat function
+ *
+ *
+ * @param {string} string
+ * @param {number} times
+ *
+ * @return {string} resultant
+ */
+function RepeatStringNumTimes(string, times) {
+    if (times < 0) {
+        return "";
+    }
+    return ((times <= 1)  ? string : string + RepeatStringNumTimes(string, times - 1));
+}
+
+/*
  * Remove spaces and blanks from an array by creating a new array with those indicies removed
  *
  * @param {array} arr
@@ -133,13 +149,13 @@ function SetDDExclusions() {
     // store exclusions given in a cookie
     const exclusionObj = document.getElementsByTagName("excludeDD");
     if (exclusionObj.length < 1) {
-        return
+        return;
     }
-    let exclusions = exclusionObj[0].innerHTML.split(" ").join("").split("|");
+    const exclusions = exclusionObj[0].innerHTML.split(" ").join("").split("|");
     // each exclusions is formatted QuestionName,opt1,opt2,opt3,...
     for (let i = 0; i < exclusions.length; i++) {
-        let exclusion = exclusions[i].trim().split(",");
-        let qName = exclusion.splice(0, 1)[0];
+        const exclusion = exclusions[i].trim().split(",");
+        const qName = exclusion.splice(0, 1)[0];
         // store everything in a cookie
         let cookieVal = "";
         for (let j = 0; j < exclusion.length; j++) {
@@ -182,13 +198,11 @@ function PickRandomRadioAnswer() {
         }
     }
     let radioId = answers[checkedIndex].id.replace("javatbd", "answer");
-    let isOther = false;
     let button;
     // if the selected answer is an "other" option, fill in the text
     if (radioId.indexOf("other") !== -1) {
         // TODO Numerical inputs need to be distinguished
         // select button for other option
-        isOther = true;
         radioId = radioId.replace("other", "");
         document.getElementById(radioId + 'othertext').value='2000';
         button = document.getElementById("SOTH" + radioId.replace("answer", ""));
@@ -198,6 +212,32 @@ function PickRandomRadioAnswer() {
         button.checked = true;
     }
     button.onclick();
+    $('#movenextbtn, #movesubmitbtn').trigger('click');
+}
+
+/*
+ * Run DD for a Multiple choice question. Selects a random answer from a multiple choice question,
+ * and emulates the submit button being pressed.
+ *
+ */
+function PickRandomMultiChoiceAnswer() {
+    // pick a random radio answer
+    const answers = document.getElementsByClassName("answer-item");
+    const checkedIndex = GetRandomInt(0, answers.length);
+
+    let multiId = answers[checkedIndex].id.replace("javatbd", "answer");
+    // if the selected answer is an "other" option, fill in the text
+    if (multiId.indexOf("other") !== -1) {
+        // TODO Numerical inputs need to be distinguished
+        // select button for other option
+        multiId = multiId.replace("other", "");
+        document.getElementById(multiId.replace("answer", "java") + 'other').value='2000';
+        document.getElementById(multiId + 'other').value='2000';
+        document.getElementById(multiId + 'othercbox').checked = true;
+    } else {
+        const button = document.getElementById(multiId).checked = true;
+        button.checked = true;
+    }
     $('#movenextbtn, #movesubmitbtn').trigger('click');
 }
 
@@ -215,13 +255,12 @@ function PickRandomArrayAnswer() {
         if (answers[row].style.cssText == "display: none;") {
             continue;
         }
-        let radios = answers[row].getElementsByClassName("answer-item");
-        let checkedIndex = GetRandomInt(0, radios.length);
+        const radios = answers[row].getElementsByClassName("answer-item");
+        const checkedIndex = GetRandomInt(0, radios.length);
         let radioId = answers[row].id.replace("javatbd", "answer");
-        let val = radios[checkedIndex].getElementsByClassName("radio").item(0).value;
-        checkedIndex += 1;
+        const val = radios[checkedIndex].getElementsByClassName("radio").item(0).value;
         radioId += "-" + val.toString();
-        let button = document.getElementById(radioId);
+        const button = document.getElementById(radioId);
         button.checked = true;
         button.onclick();
     }
@@ -236,6 +275,20 @@ function PickRandomArrayAnswer() {
 function EnterTextInShortText() {
     const answers = document.getElementsByClassName("answer-item");
     answers[0].getElementsByClassName("form-control")[0].value = "Dummy data";
+    $('#movenextbtn, #movesubmitbtn').trigger('click');
+}
+
+/*
+ * Run DD for a numberic input question. Writes, a random number of the input length, length
+ *
+ */
+function EnterNumericText() {
+    const answers = document.getElementsByClassName("answer-item");
+    let maxLength = answers[0].getElementsByClassName("form-control")[0].maxLength;
+    if (maxLength !== undefined) {
+        maxLength = GetRandomInt(1, 4);
+    }
+    answers[0].getElementsByClassName("form-control")[0].value = GetRandomInt(0, parseInt(RepeatStringNumTimes("9", maxLength)));
     $('#movenextbtn, #movesubmitbtn').trigger('click');
 }
 
@@ -264,6 +317,10 @@ function RunDD() {
             EnterTextInShortText();
         } else if (document.getElementsByClassName("boilerplate").length > 0) {
             $('#movenextbtn, #movesubmitbtn').trigger('click');
+        } else if (document.getElementsByClassName("multiple-opt").length > 0) {
+            PickRandomMultiChoiceAnswer();
+        } else if (document.getElementsByClassName("numeric").length > 0) {
+            EnterNumericText();
         } else {
             $('#movenextbtn, #movesubmitbtn').trigger('click');
         }
@@ -354,10 +411,9 @@ function ProcessRotation(useUl=false) {
         // generate a random order, respecting anchors
         let options = htmlObj.innerHTML.split("\n").join("").split("|");
         options = options.filter(function(el) {
-            return el && (el.trim() != '');
+            return el;
         });
-        let rotatingIndicies = [];
-        let anchoredIndicies = [];
+        const rotatingIndicies = [];
         for (let i = 0; i < options.length; i++) {
             if (!options[i].startsWith("$$")) {
                 rotatingIndicies.push(i);
@@ -374,8 +430,11 @@ function ProcessRotation(useUl=false) {
         if (storeRotation) {
             CURRENT_ROTATIONS.push({
                     id: htmlId,
-                    order: rotatingIndicies
-                });
+                    order: rotatingIndicies,
+                    rotated: rotatingIndicies.slice(0).every(function(num, idx, arr) {
+                        return (num <= arr[idx + 1]) || (idx === arr.length - 1) ? 1 : 0;
+                    })
+            });
         }
         RotateText(htmlObj, rotatingIndicies, useUl);
     }
@@ -392,7 +451,7 @@ function ProcessRotation(useUl=false) {
 function RotateText(htmlObj, order, useUl) {
     let options = htmlObj.innerHTML.split("\n").join("").split("$$").join("").split("|");
     options = options.filter(function(el) {
-        return el && (el.trim() != '');
+        return el;
     });
 
     // arrange the options in the given order
@@ -400,9 +459,11 @@ function RotateText(htmlObj, order, useUl) {
     for (let i = 0; i < order.length; i++) {
         temp.push(options[order[i]]);
     }
-    options = temp;
+    options = temp.filter(function(el) {
+        return el;
+    });
 
-    let ansRotation = [];
+    const ansRotation = [];
     for (let i = 0; i < options.length; i++) {
         let content = options[i].match(/\[(.*?)\]/);
         if (content !== null) {
@@ -417,11 +478,10 @@ function RotateText(htmlObj, order, useUl) {
 
 
     // clear existing answer HTML objects and store them
-    let ansList, ans, answerOptions;
     if (ansRotation.length > 0) {
-        ansList = document.getElementsByClassName("answers-list").item(0);
-        ans = document.getElementsByClassName("answer-item");
-        answerOptions = [];
+        const ansList = document.getElementsByClassName("answers-list").item(0);
+        const ans = document.getElementsByClassName("answer-item");
+        const answerOptions = [];
         for (let i = ans.length - 1; i >= 0; i--) {
             answerOptions.push(ans.item(0));
             ansList.removeChild(ans.item(0));
@@ -446,10 +506,13 @@ function RotateText(htmlObj, order, useUl) {
     const prefix = useUl ? "<li>" : "";
     const suffix = useUl ? "</li>" : "";
     for (let i = 0; i < options.length; i++) {
-        result += prefix + options[i] + suffix;
+        if (options[i].trim() == '' && useUl) {
+            continue;
+        } else {
+            result += prefix + options[i] + suffix;
+        }
     }
     $(htmlObj).replaceWith(result);
-    //console.log({a: options, b : ansRotation});
 }
 
 
@@ -500,18 +563,20 @@ function AnswersFlip() {
     const start = parseInt(data[0]);
     const end = parseInt(data[1]);
 
-    let ansList = document.getElementsByClassName("answers-list").item(0);
-    let ans = document.getElementsByClassName("answer-item");
+    const ansList = document.getElementsByClassName("answers-list").item(0);
+    const ans = document.getElementsByClassName("answer-item");
 
-    let answerOptions = [];
+    const answerOptions = [];
 
     for (let i = ans.length - 1; i >= 0; i--) {
         answerOptions.push(ans.item(0));
         ansList.removeChild(ans.item(0));
     }
     // get a sub array of values between start and end
-    let arrFlipped = answerOptions.slice(start, end + 1);
-    if (CURRENT_ROTATIONS[ansFlip[0].id] != -1) {
+    const arrFlipped = answerOptions.slice(start, end + 1);
+    const rotIndex = GetRotationIndexById(ansFlip[0].id);
+    if (rotIndex != -1 && CURRENT_ROTATIONS[rotIndex].rotated) {
+        // if the id exists, it's rotated before. Flip the answers.
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
     } else if (GetRandomInt(0, 100) >= 50) {
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
@@ -535,7 +600,7 @@ function AnswerInsertWord() {
         return;
     }
     toInsert = toInsert[0].innerText.split(",");
-    let ans = document.getElementsByClassName("answer-item").item(parseInt(toInsert[1])).getElementsByClassName("label-text label-clickable").item(0);
+    const ans = document.getElementsByClassName("answer-item").item(parseInt(toInsert[1])).getElementsByClassName("label-text label-clickable").item(0);
     $("<br><p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + toInsert[0] + "<p>").insertAfter($(ans));
     toInsert = document.getElementsByTagName("ansInsWord");
     $(toInsert).replaceWith("");
@@ -554,7 +619,7 @@ function SetpMode(value) {
  * @param {string} tagName
  */
 function RemoveTagText(tagName) {
-    let docTags = document.getElementsByTagName(tagName);
+    const docTags = document.getElementsByTagName(tagName);
     while (docTags.length > 0) {
         docTags[0].parentNode.removeChild(docTags[0]);
     }
@@ -564,11 +629,11 @@ function RemoveTagText(tagName) {
  * Replace text based on mode.
  *
  * @param {HTML} <p-o>Phone only text</p-o>
+ * @param {HTML} <e-o>Email only text</e-o>
+ * @param {HTML} <t-o>Texting only text</t-o>
  * @param {HTML} <e-t>Email and Texting only text</e-t>
  */
 function ParseModeText() {
-    // <p-o></p-o> = Phone only
-    // <e-t></e-t> = Email and Text
     let mode = Cookies.get('pMode');
     if (parseInt(mode) == undefined) {
         return;
@@ -601,11 +666,65 @@ function ParseModeText() {
 
 
 /*
+ * Store the CURRENT_ROTATIONS array into a cookie in a parsable string format
+ *
+ */
+ function RotationsToCookie() {
+     let toStore = "";
+     for (let i = 0; i < CURRENT_ROTATIONS.length; i++) {
+         const id = CURRENT_ROTATIONS[i].id.toString();
+         const order = CURRENT_ROTATIONS[i].order.toString();
+         const rotationStatus = CURRENT_ROTATIONS[i].rotated.toString();
+         toStore += id + "|" + order + "|" + rotationStatus + "[NEXT]";
+     }
+     Cookies.remove("CRO");
+     Cookies.set("CRO", toStore);
+ }
+
+
+/*
+ * From a formatted string, populate the CURRENT_ROTATIONS array -> Store rotation orders cross question
+ *
+ */
+ function RotationsFromString() {
+    CURRENT_ROTATIONS = [];
+    let data = Cookies.get("CRO");
+    if (data === undefined) {
+        return;
+    }
+    data = data.split("[NEXT]").filter(function(el) {
+        return el;
+    });
+    for (let i = 0; i < data.length; i++) {
+        const rotation = data[i].split("|");
+        const identifier = rotation[0];
+        let rotOrder = rotation[1].split(",");
+        for (let j = 0; j < rotOrder.length; j++) {
+            rotOrder[j] = parseInt(rotOrder[j]);
+        }
+        CURRENT_ROTATIONS.push({
+            id: identifier,
+            order: rotOrder,
+            rotated: rotation[2] == "true",
+        });
+    }
+ }
+
+/*
  * Functions to execute per question. Functions appear in order of execution.
  */
 $(document).ready(function()  {
-    SetDDExclusions();
+    // if the survey is completed or terminated, then reset relevant cookies
+    if (document.getElementsByClassName("completed-table").length > 0) {
+        Cookies.remove("rotationTracker");
+        Cookies.remove("CRO");
+        Cookies.remove("runDD");
+        return;
+    }
+    // restore CURRENT_ROTATIONS array
+    RotationsFromString();
     // Dummy Data
+    SetDDExclusions();
     RunDD();
     // Rotation tracker
     RotationTracker();
@@ -617,4 +736,6 @@ $(document).ready(function()  {
     AnswersFlip();
     // Insert text between options
     AnswerInsertWord();
+    // store CURRENT_ROTATIONS array for use in next question
+    RotationsToCookie();
 });
