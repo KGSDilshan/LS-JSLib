@@ -419,7 +419,14 @@ function ProcessRotation(useUl=false) {
                 rotatingIndicies.push(i);
             }
         }
-        rotatingIndicies.sort(() => Math.random() - 0.5);
+        rotatingIndicies.sort(function() {return Math.random() - 0.5});
+        let rotatedArr = false;
+        for (let i = 0; i < rotatingIndicies.length - 1; i++) {
+            if (rotatingIndicies[i] > rotatingIndicies[i + 1]) {
+                rotatedArr = true;
+                break;
+            }
+        }
         // loop through options array
         for (let i = 0; i < options.length; i++) {
             // insert into rotatingIndicies, anchored options
@@ -431,9 +438,7 @@ function ProcessRotation(useUl=false) {
             CURRENT_ROTATIONS.push({
                     id: htmlId,
                     order: rotatingIndicies,
-                    rotated: rotatingIndicies.slice(0).every(function(num, idx, arr) {
-                        return (num <= arr[idx + 1]) || (idx === arr.length - 1) ? 1 : 0;
-                    })
+                    rotated: rotatedArr,
             });
         }
         RotateText(htmlObj, rotatingIndicies, useUl);
@@ -575,9 +580,16 @@ function AnswersFlip() {
     // get a sub array of values between start and end
     const arrFlipped = answerOptions.slice(start, end + 1);
     const rotIndex = GetRotationIndexById(ansFlip[0].id);
-    if (rotIndex != -1 && CURRENT_ROTATIONS[rotIndex].rotated) {
-        // if the id exists, it's rotated before. Flip the answers.
-        FlipArr(arrFlipped, ansList, answerOptions, start, end);
+    if (rotIndex != -1) {
+        if (CURRENT_ROTATIONS[rotIndex].rotated) {
+            // if the id exists, it's rotated before. Flip the answers.
+            FlipArr(arrFlipped, ansList, answerOptions, start, end);
+        } else {
+            // repopulate ansOptions
+            for (let i = 0; i < answerOptions.length; i++) {
+                ansList.append(answerOptions[i]);
+            }
+        }
     } else if (GetRandomInt(0, 100) >= 50) {
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
     } else {
