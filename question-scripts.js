@@ -166,6 +166,35 @@ function SetDDExclusions() {
     $(exclusionObj).replaceWith("");
 }
 
+/*
+ * Get indicies of answer options which have a visible relevance
+ *
+ * @param {Array} answers - HTML Object array of answer options
+ *
+ * @return {Array} validIndicies - Array of numbers containing valid indicies
+ */
+function GetRelevantAnswers(answers) {
+    const validIndicies = [];
+    let nonRelevant = document.getElementById("answer-relevance");
+    if (nonRelevant) {
+        nonRelevant = JSON.parse(nonRelevant.getAttribute("data-relv"));
+    }
+    for (let i = 0; i < answers.length; i++) {
+        let seen = false;
+        for (let j = 0; j < nonRelevant.length; j++) {
+            const qnameData = "javatbd" + document.getElementById("fieldnames").value + nonRelevant[j];
+            if (answers[i].id === qnameData) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen) {
+            validIndicies.push(i);
+        }
+    }
+    return validIndicies;
+}
+
 
 /*
  * Run DD for a radio question. Selects a random answer from a radio question, and emulates the
@@ -180,13 +209,22 @@ function PickRandomRadioAnswer() {
     const currentQname = document.getElementById("QNameNumData").dataset.code;
     let exclusiveOpts = Cookies.get(currentQname);
     let checkedIndex;
+    // populate a list of valid codes
+    const validIndicies = GetRelevantAnswers(answers);
     if (exclusiveOpts === undefined) {
-        checkedIndex = GetRandomInt(0, answers.length);
+        // randomize and pick an index out of that list
+        validIndicies.sort(function() {
+            return Math.random() - 0.5;
+        });
+        checkedIndex = validIndicies[0];
     } else {
         let foundOpt = true;
         exclusiveOpts = exclusiveOpts.trim().split(",");
         while (foundOpt == true) {
-            checkedIndex = GetRandomInt(0, answers.length).toString();
+            validIndicies.sort(function() {
+                return Math.random() - 0.5;
+            });
+            checkedIndex = validIndicies[0];
             // see if the checked index is in the list
             foundOpt = false;
             for (let i = 0; i < exclusiveOpts.length; i++) {
@@ -223,8 +261,12 @@ function PickRandomRadioAnswer() {
 function PickRandomMultiChoiceAnswer() {
     // pick a random radio answer
     const answers = document.getElementsByClassName("answer-item");
-    const checkedIndex = GetRandomInt(0, answers.length);
-
+    const validIndicies = GetRelevantAnswers(answers);
+    // randomize and pick an index out of that list
+    validIndicies.sort(function() {
+        return Math.random() - 0.5;
+    });
+    const checkedIndex = validIndicies[0];
     let multiId = answers[checkedIndex].id.replace("javatbd", "answer");
     // if the selected answer is an "other" option, fill in the text
     if (multiId.indexOf("other") !== -1) {
@@ -434,6 +476,7 @@ function ProcessRotation(useUl=false) {
                 rotatingIndicies.splice(i, 0, i);
             }
         }
+
         if (storeRotation) {
             CURRENT_ROTATIONS.push({
                     id: htmlId,
@@ -480,7 +523,6 @@ function RotateText(htmlObj, order, useUl) {
             }
         }
     }
-
 
     // clear existing answer HTML objects and store them
     if (ansRotation.length > 0) {
@@ -750,4 +792,8 @@ $(document).ready(function()  {
     AnswerInsertWord();
     // store CURRENT_ROTATIONS array for use in next question
     RotationsToCookie();
+    // remove margin on next button if mode is mobile
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+        $("div#navigator-container").css("margin", "0px");
+    }
 });
