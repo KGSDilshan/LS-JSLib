@@ -699,20 +699,21 @@ function ParseModeText() {
         return
     }
     switch (mode) {
-        case 1:
-            // phone mode, hide all email and text tags
-            RemoveTagText("E-T");
-            RemoveTagText("E-O");
-            RemoveTagText("T-O");
-            break;
         case 2:
-            // email, hide all text and phone only tags
+        case 4:
+            // email/panel, hide all text and phone only tags
             RemoveTagText("P-O");
             RemoveTagText("T-O");
             break;
         case 3:
             // text, hide all email and phone only tags
             RemoveTagText("P-O");
+            RemoveTagText("E-O");
+            break;
+        default:
+            // Default to phone mode, hide all email and text tags
+            RemoveTagText("E-T");
+            RemoveTagText("E-O");
             RemoveTagText("T-O");
             break;
     };
