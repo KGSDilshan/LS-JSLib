@@ -543,8 +543,8 @@ function RotateText(htmlObj, order, useUl) {
                 temp.push(answerOptions[i]);
             }
         }
-        for (let i = 0; i < temp.length; i++) {
-            ansList.append(temp[i]);
+        for (let i = temp.length; i > 0; i--) {
+            ansList.prepend(temp[i - 1]);
         }
     }
 
