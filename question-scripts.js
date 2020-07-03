@@ -382,7 +382,8 @@ function RunDD() {
  */
 function RotationTracker() {
     let rotTracker = Cookies.get('rotationTracker');
-    const currentQname = document.getElementById("QNameNumData").dataset.code;
+    const currentQname = document.getElementById("QNameNumData");
+    currentQname = currentQName ? currentQname.dataset.code : null;
     if (rotTracker === undefined) {
         // initialize rotation tracker and add the current question to it
         Cookies.set('rotationTracker', currentQname)
@@ -696,7 +697,7 @@ function ParseModeText() {
         mode = parseInt(mode);
     } catch (err) {
         console.log("Couldn't convert pMode to int. pMode is: " + mode);
-        return
+        return;
     }
     switch (mode) {
         case 2:
