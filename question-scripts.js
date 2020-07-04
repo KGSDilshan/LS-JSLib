@@ -382,7 +382,8 @@ function RunDD() {
  */
 function RotationTracker() {
     let rotTracker = Cookies.get('rotationTracker');
-    const currentQname = document.getElementById("QNameNumData").dataset.code;
+    const currentQname = document.getElementById("QNameNumData");
+    currentQname = currentQName ? currentQname.dataset.code : null;
     if (rotTracker === undefined) {
         // initialize rotation tracker and add the current question to it
         Cookies.set('rotationTracker', currentQname)
@@ -512,11 +513,12 @@ function RotateText(htmlObj, order, useUl) {
     });
 
     const ansRotation = [];
+    let anchorSyntax = /\[([0-9,]+)\]/;
     for (let i = 0; i < options.length; i++) {
-        let content = options[i].match(/\[(.*?)\]/);
+        let content = options[i].match(anchorSyntax);
         if (content !== null) {
             content = content[1];
-            options[i] = options[i].replace("[" + content + "]", "");
+            options[i] = options[i].replace(anchorSyntax, "");
             content = content.split(" ").join("").split("\t").join("").split(",");
             for (let j = 0; j < content.length; j++) {
                 ansRotation.push(content[j]);
@@ -543,8 +545,8 @@ function RotateText(htmlObj, order, useUl) {
                 temp.push(answerOptions[i]);
             }
         }
-        for (let i = 0; i < temp.length; i++) {
-            ansList.append(temp[i]);
+        for (let i = temp.length; i > 0; i--) {
+            ansList.prepend(temp[i - 1]);
         }
     }
 
@@ -561,6 +563,7 @@ function RotateText(htmlObj, order, useUl) {
     }
     $(htmlObj).replaceWith(result);
 }
+
 
 
 /*
@@ -696,23 +699,24 @@ function ParseModeText() {
         mode = parseInt(mode);
     } catch (err) {
         console.log("Couldn't convert pMode to int. pMode is: " + mode);
-        return
+        return;
     }
     switch (mode) {
-        case 1:
-            // phone mode, hide all email and text tags
-            RemoveTagText("E-T");
-            RemoveTagText("E-O");
-            RemoveTagText("T-O");
-            break;
         case 2:
-            // email, hide all text and phone only tags
+        case 4:
+            // email/panel, hide all text and phone only tags
             RemoveTagText("P-O");
             RemoveTagText("T-O");
             break;
         case 3:
             // text, hide all email and phone only tags
             RemoveTagText("P-O");
+            RemoveTagText("E-O");
+            break;
+        default:
+            // Default to phone mode, hide all email and text tags
+            RemoveTagText("E-T");
+            RemoveTagText("E-O");
             RemoveTagText("T-O");
             break;
     };
