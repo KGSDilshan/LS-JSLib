@@ -513,11 +513,12 @@ function RotateText(htmlObj, order, useUl) {
     });
 
     const ansRotation = [];
+    let anchorSyntax = /\[([0-9,]+)\]/;
     for (let i = 0; i < options.length; i++) {
-        let content = options[i].match(/\[(.*?)\]/);
+        let content = options[i].match(anchorSyntax);
         if (content !== null) {
             content = content[1];
-            options[i] = options[i].replace("[" + content + "]", "");
+            options[i] = options[i].replace(anchorSyntax, "");
             content = content.split(" ").join("").split("\t").join("").split(",");
             for (let j = 0; j < content.length; j++) {
                 ansRotation.push(content[j]);
@@ -562,6 +563,7 @@ function RotateText(htmlObj, order, useUl) {
     }
     $(htmlObj).replaceWith(result);
 }
+
 
 
 /*
