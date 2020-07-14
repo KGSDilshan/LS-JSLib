@@ -383,7 +383,7 @@ function RunDD() {
 function RotationTracker() {
     let rotTracker = Cookies.get('rotationTracker');
     let currentQname = document.getElementById("QNameNumData");
-    currentQname = currentQName ? currentQname.dataset.code : null;
+    currentQname = currentQname ? currentQname.dataset.code : null;
     if (rotTracker === undefined) {
         // initialize rotation tracker and add the current question to it
         Cookies.set('rotationTracker', currentQname)
