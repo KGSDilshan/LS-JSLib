@@ -591,8 +591,8 @@ function ProcessAllRotations() {
  */
 function FlipArr(arrFlipped, ansList, answerOptions, start, end) {
     arrFlipped.reverse();
-    for (let i = 0; i < answerOptions.length; i++) {
-        ansList.append((i >= start && i <= end) ? (arrFlipped[i - start]) : answerOptions[i]);
+    for (let i = answerOptions.length - 1; i >= 0; i--) {
+        ansList.prepend((i >= start && i <= end) ? (arrFlipped[i]) : answerOptions[i]);
     }
 }
 
@@ -631,16 +631,16 @@ function AnswersFlip() {
             FlipArr(arrFlipped, ansList, answerOptions, start, end);
         } else {
             // repopulate ansOptions
-            for (let i = 0; i < answerOptions.length; i++) {
-                ansList.append(answerOptions[i]);
+            for (let i = answerOptions.length; i > 0; i--) {
+                ansList.prepend(answerOptions[i - 1]);
             }
         }
     } else if (GetRandomInt(0, 100) >= 50) {
         FlipArr(arrFlipped, ansList, answerOptions, start, end);
     } else {
         // repopulate ansOptions
-        for (let i = 0; i < answerOptions.length; i++) {
-            ansList.append(answerOptions[i]);
+        for (let i = answerOptions.length; i > 0; i--) {
+            ansList.prepend(answerOptions[i - 1]);
         }
     }
 }
